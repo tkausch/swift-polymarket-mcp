@@ -36,6 +36,21 @@ public struct PolymarketClient: Sendable {
         return try await get(gamma, "markets", items)
     }
 
+    /// Pages through `markets(_:)` until the API returns a short page or `maxMarkets` is reached.
+    ///
+    /// Uses `q.limit` as the page size and starts at `q.offset`.
+    public func allMarkets(_ q: MarketQuery = .init(), maxMarkets: Int = 1000) async throws -> [Market] {
+        var query = q
+        var result: [Market] = []
+        while result.count < maxMarkets {
+            let page = try await markets(query)
+            result += page
+            if page.count < query.limit { break }
+            query.offset += query.limit
+        }
+        return Array(result.prefix(maxMarkets))
+    }
+
     public func market(slug: String) async throws -> Market {
         var q = MarketQuery(); q.slug = slug; q.active = nil; q.closed = nil; q.limit = 1
         guard let m = try await markets(q).first else { throw PolymarketError.notFound(slug) }
@@ -81,6 +96,21 @@ public struct PolymarketClient: Sendable {
         try await get(clob, "book", [.init(name: "token_id", value: tokenId)])
     }
 
+    /// Fetches many order books with a single request (`POST /books`).
+    ///
+    /// Tokens the CLOB does not know are silently missing from the result, so the result can be
+    /// smaller than `tokenIds`. Keys are token IDs. Requests are split into chunks of `chunkSize`.
+    public func orderBooks(tokenIds: [String], chunkSize: Int = 100) async throws -> [String: OrderBook] {
+        var result: [String: OrderBook] = [:]
+        for start in stride(from: 0, to: tokenIds.count, by: chunkSize) {
+            let chunk = tokenIds[start..<min(start + chunkSize, tokenIds.count)]
+            let body = try JSONEncoder().encode(chunk.map { ["token_id": $0] })
+            let books: [OrderBook] = try await send(clob, "books", method: "POST", body: body)
+            for b in books { if let id = b.assetId { result[id] = b } }
+        }
+        return result
+    }
+
     /// Price quoted by the CLOB for a side. Observed live: `.buy` returns the best bid
     /// and `.sell` the best ask (the API's side is the book side, not the taker's side).
     /// Use `orderBook(tokenId:)` if you need explicit bid/ask.
@@ -116,11 +146,21 @@ public struct PolymarketClient: Sendable {
 
     private func get<T: Decodable>(_ base: URL, _ path: String,
                                    _ query: [URLQueryItem]) async throws -> T {
+        try await send(base, path, query: query)
+    }
+
+    private func send<T: Decodable>(_ base: URL, _ path: String, query: [URLQueryItem] = [],
+                                    method: String = "GET", body: Data? = nil) async throws -> T {
         var comps = URLComponents(url: base.appendingPathComponent(path),
                                   resolvingAgainstBaseURL: false)!
         if !query.isEmpty { comps.queryItems = query }
         var req = URLRequest(url: comps.url!)
+        req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            req.httpBody = body
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         req.timeoutInterval = 20
 
         var attempt = 0

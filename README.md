@@ -79,6 +79,19 @@ swift run polymarket-cli search "fed rate"
 swift run polymarket-cli book will-the-us-invade-iran-before-2027
 ```
 
+## Using the library
+
+`PolymarketAdapter` can be used on its own:
+
+```swift
+let client = PolymarketClient()
+let markets = try await client.allMarkets()                       // pages through Gamma
+let tokens = markets.filter(\.acceptingOrders).flatMap(\.clobTokenIds)
+let books = try await client.orderBooks(tokenIds: tokens)         // one batched CLOB request per 100 tokens
+```
+
+`Market` also exposes `negRisk`, `enableOrderBook`, `acceptingOrders` and `orderPriceMinTickSize`.
+
 ## Project layout
 
 ```

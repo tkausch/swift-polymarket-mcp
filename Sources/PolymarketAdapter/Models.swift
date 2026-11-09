@@ -66,11 +66,21 @@ public struct Market: Decodable, Sendable, Identifiable, Hashable {
     public let endDate: String?
     /// URL of the market's image.
     public let image: String?
+    /// Whether this market belongs to a "negative risk" group of mutually exclusive outcomes
+    /// (exactly one market in the group resolves Yes). `false` if the API did not say.
+    public let negRisk: Bool
+    /// Whether the market trades on the CLOB order book. `false` if the API did not say.
+    public let enableOrderBook: Bool
+    /// Whether the market currently accepts new orders. `false` if the API did not say.
+    public let acceptingOrders: Bool
+    /// Minimum price increment of the market's order book (e.g. 0.01 or 0.001).
+    public let orderPriceMinTickSize: Double?
 
     enum CodingKeys: String, CodingKey {
         case id, question, conditionId, slug, description, outcomes, outcomePrices
         case clobTokenIds, volume, volumeNum, liquidity, liquidityNum
         case active, closed, endDate, image
+        case negRisk, enableOrderBook, acceptingOrders, orderPriceMinTickSize
     }
 
     /// Decodes a market, tolerating the API's inconsistent field types.
@@ -93,6 +103,10 @@ public struct Market: Decodable, Sendable, Identifiable, Hashable {
         closed = (try? c.decode(Bool.self, forKey: .closed)) ?? false
         endDate = try? c.decode(String.self, forKey: .endDate)
         image = try? c.decode(String.self, forKey: .image)
+        negRisk = (try? c.decode(Bool.self, forKey: .negRisk)) ?? false
+        enableOrderBook = (try? c.decode(Bool.self, forKey: .enableOrderBook)) ?? false
+        acceptingOrders = (try? c.decode(Bool.self, forKey: .acceptingOrders)) ?? false
+        orderPriceMinTickSize = c.lenientDouble(.orderPriceMinTickSize)
     }
 
     /// `endDate` parsed as a `Date`.
