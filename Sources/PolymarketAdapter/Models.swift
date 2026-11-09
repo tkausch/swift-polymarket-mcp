@@ -352,3 +352,52 @@ public enum PolymarketError: Error, LocalizedError, Sendable {
         }
     }
 }
+
+// MARK: - Depth helpers
+
+extension OrderBook {
+    /// Human-readable depth: bids high→low and asks low→high, each level with its size and
+    /// cumulative size, limited to `levels` per side.
+    public func depthDescription(levels: Int) -> String {
+        func side(_ ls: [OrderLevel]) -> String {
+            var cum = 0.0
+            let rows = ls.prefix(levels).map { l -> String in
+                cum += l.size
+                return "  \(l.price) x\(l.size)  (cum \(String(format: "%.2f", cum)))"
+            }
+            return rows.isEmpty ? "  –" : rows.joined(separator: "\n")
+        }
+        let sortedBids = bids.sorted { $0.price > $1.price }
+        let sortedAsks = asks.sorted { $0.price < $1.price }
+        let tick = tickSize.map { String($0) } ?? "–"
+        let minSize = minOrderSize.map { String($0) } ?? "–"
+        let spreadText = spread.map { String(format: "%.4f", $0) } ?? "–"
+        return "token \(assetId ?? "?")  tick \(tick)  min size \(minSize)  spread \(spreadText)\n"
+            + "BIDS (\(bids.count) levels)\n\(side(sortedBids))\nASKS (\(asks.count) levels)\n\(side(sortedAsks))"
+    }
+}
+
+/// Sums of best asks and best bids across the Yes books of one event, for the
+/// "outcomes don't add up to 100%" check.
+public struct BookSums: Sendable {
+    public let askSum: Double
+    public let bidSum: Double
+    /// Number of markets expected (including those with no book).
+    public let expected: Int
+    /// `true` only if every expected market has both a best bid and a best ask.
+    public let complete: Bool
+
+    public init(books: [OrderBook], expected: Int) {
+        let asks = books.compactMap { $0.bestAsk?.price }
+        let bids = books.compactMap { $0.bestBid?.price }
+        askSum = asks.reduce(0, +); bidSum = bids.reduce(0, +)
+        self.expected = expected
+        complete = asks.count == expected && bids.count == expected
+    }
+
+    public var summary: String {
+        "Yes best asks sum \(String(format: "%.4f", askSum)), best bids sum \(String(format: "%.4f", bidSum)) over \(expected) markets"
+            + (complete ? "" : " (some sides empty; sums incomplete)")
+            + ". Only meaningful for mutually exclusive, exhaustive (neg-risk) events; asks < 1 or bids > 1 may be an arbitrage before fees and size limits."
+    }
+}
