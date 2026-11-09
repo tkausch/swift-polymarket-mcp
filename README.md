@@ -23,6 +23,8 @@ Written in Swift 6 and split into a reusable client library, a CLI and the MCP s
 | `search_markets` | Search active events and markets by text | `query`, `limit` (default 5, max 20) |
 | `get_market` | Details, odds and CLOB token IDs for one market | `slug` |
 | `order_book` | Best bid/ask, size and spread per outcome | `slug` |
+| `book_depth` | Full bid/ask depth with sizes and cumulative size for one outcome (CLOB `GET /book`) | `token_id` or `slug` + `outcome`, `levels` (default 10) |
+| `order_books` | Many books in one call (CLOB `POST /books`, max 500). With `event_slug` it scans every market's Yes token and sums best asks/bids for the "outcomes don't add up to 100%" check | `token_ids` or `event_slug`, `levels` (default 3) |
 | `price_history` | Price history for one outcome | `slug`, `outcome`, `interval` (`1h`, `6h`, `1d`, `1w`, `max`; default `1d`) |
 
 Example output of `top_markets`:
