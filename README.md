@@ -57,17 +57,25 @@ Restart the session and the five tools above become available. Rebuild with `swi
 
 ## Use with Claude Desktop
 
-Add this to `claude_desktop_config.json`:
+Build the release binary first (`swift build -c release`), then open the config file via **Claude → Settings → Developer → Edit Config**, or edit it directly:
+
+```
+~/Library/Application Support/Claude/claude_desktop_config.json
+```
+
+Add the server under `mcpServers` (merge it with existing entries if the file already has some):
 
 ```json
 {
   "mcpServers": {
     "polymarket": {
-      "command": "/absolute/path/to/.build/release/polymarket-mcp"
+      "command": "/absolute/path/to/polymarket-mcp/.build/release/polymarket-mcp"
     }
   }
 }
 ```
+
+Replace the path with the output of `echo "$(pwd)/.build/release/polymarket-mcp"` run from the repository root. It must be absolute; `~` and relative paths are not expanded. Fully quit and restart Claude Desktop afterwards. The `polymarket` tools then appear in the tools menu.
 
 ## CLI
 
